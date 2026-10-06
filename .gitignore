@@ -1,0 +1,98 @@
+# ==========================================
+# Environment Variables & Secrets
+# ==========================================
+.env
+.env.*
+!.env.example
+*.env
+
+# ==========================================
+# Terraform
+# ==========================================
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+crash.log
+crash.*.log
+*.tfvars
+!*.tfvars.example
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# ==========================================
+# Python & Bytecode
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# ==========================================
+# Faust & Stream Processing Local State
+# ==========================================
+*-data/
+.faust/
+volatility-monitor-data/
+*.db
+*.sqlite3
+
+# ==========================================
+# Docker & Local Data Mounts
+# ==========================================
+timescaledb_data/
+docker_data/
+data/
+
+# ==========================================
+# Logs & Temporary Files
+# ==========================================
+*.log
+logs/
+*.tmp
+*.temp
+
+# Temporary Microsoft Office files (auto-save)
+~$*.docx
+~$*.xlsx
+~$*.pptx
+
+# ==========================================
+# IDEs & Operating System
+# ==========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

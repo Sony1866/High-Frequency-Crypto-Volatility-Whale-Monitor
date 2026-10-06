@@ -1,0 +1,17 @@
+# Stream processing
+faust-streaming
+
+# Kafka
+kafka-python-ng
+
+# Telegram alerting
+python-telegram-bot
+
+# Monitoring
+prometheus-client
+
+# WebSocket client (Binance)
+websockets
+
+# TimescaleDB async driver
+asyncpg

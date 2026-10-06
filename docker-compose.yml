@@ -1,0 +1,156 @@
+services:
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - trading-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    hostname: kafka
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_NUM_PARTITIONS: 3
+    mem_limit: 512m
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - trading-net
+
+  binance-producer:
+    build:
+      context: .
+      dockerfile: Dockerfile.producer
+    container_name: binance-producer
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_TOPIC: trades-stream
+      TRADING_PAIRS: btcusdt
+    restart: on-failure
+    networks:
+      - trading-net
+
+  faust:
+    build:
+      context: .
+      dockerfile: Dockerfile.faust
+    container_name: faust
+    depends_on:
+      kafka:
+        condition: service_healthy
+      timescaledb:
+        condition: service_started
+    ports:
+      - "6066:6066"
+      - "8000:8000"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      DB_HOST: timescaledb
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASS: postgres
+      DB_NAME: volatility_db
+      WHALE_VOLUME_THRESHOLD: 10.0
+      VOLUME_SPIKE_THRESHOLD: 50.0
+      VOLATILITY_THRESHOLD: 0.005
+      WINDOW_SIZE_SECONDS: 10
+    restart: on-failure
+    networks:
+      - trading-net
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg17
+    container_name: timescaledb
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: volatility_db
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+      - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+    command: ["postgres", "-c", "shared_preload_libraries=timescaledb"]
+    networks:
+      - trading-net
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: grafana
+    ports:
+      - "3030:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - timescaledb
+    networks:
+      - trading-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - trading-net
+
+  telegram-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.telegram
+    container_name: telegram-bot
+    depends_on:
+      kafka:
+        condition: service_healthy
+      faust:
+        condition: service_started
+    environment:
+      TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      ALERTS_TOPIC: alerts
+    restart: on-failure
+    networks:
+      - trading-net
+
+volumes:
+  timescaledb_data:
+
+networks:
+  trading-net:
+    driver: bridge
